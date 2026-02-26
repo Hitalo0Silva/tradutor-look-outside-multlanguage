@@ -149,22 +149,31 @@ def configurar_diretorios():
     CONFIG["TOOL_DIR"] = os.path.join(CONFIG["GAME_DIR"], "_TRADUTOR_FILES")
     CONFIG["BACKUP_DIR"] = os.path.join(CONFIG["TOOL_DIR"], "1_Backup")
     CONFIG["OUTPUT_DIR"] = os.path.join(CONFIG["TOOL_DIR"], "2_Traduzidos")
-    CONFIG["CACHE_FILE"] = os.path.join(CONFIG["TOOL_DIR"], "memoria_traducoes.json")
+    
+    # Nome dinâmico do arquivo de cache baseado na língua
+    nome_cache = f"memoria_traducoes_{CONFIG['TARGET_LANG']}.json"
+    CONFIG["CACHE_FILE"] = os.path.join(CONFIG["TOOL_DIR"], nome_cache)
 
     for p in [CONFIG["TOOL_DIR"], CONFIG["BACKUP_DIR"], CONFIG["OUTPUT_DIR"]]:
         if not os.path.exists(p): os.makedirs(p)
 
-    cache_local = os.path.join(pasta_raiz, "memoria_traducoes.json")
+    cache_local = os.path.join(pasta_raiz, nome_cache)
     
+    # LÓGICA DE CACHE CORRIGIDA E BLINDADA
     if os.path.exists(cache_local):
         if os.path.abspath(cache_local) != os.path.abspath(CONFIG["CACHE_FILE"]):
             try:
                 shutil.copy2(cache_local, CONFIG["CACHE_FILE"])
-            except shutil.SameFileError:
-                pass
-        log_print("[AUTO] Memória de tradução importada com sucesso!")
+                log_print(f"[AUTO] Memória ({nome_cache}) copiada para a pasta do jogo!")
+            except Exception as e:
+                log_print(f"[ERRO] Falha ao copiar o cache: {e}")
+        else:
+            # Se os caminhos são os mesmos, ele apenas avisa que já está lá
+            log_print(f"[AUTO] Memória de tradução local pronta para uso.")
+    elif os.path.exists(CONFIG["CACHE_FILE"]):
+         log_print(f"[AUTO] Memória ({nome_cache}) já existente na pasta do jogo carregada!")
     else:
-        log_print("[INFO] Criando nova memória de tradução...")
+        log_print(f"[INFO] Nenhum cache encontrado. Criando nova memória: {nome_cache}...")
     
     app.after(0, habilitar_botoes)
 
@@ -192,28 +201,25 @@ def _acao_backup_thread():
         set_progresso((i + 1) / total)
     log_print(f"[OK] Backup concluído em: {CONFIG['BACKUP_DIR']}")
 
-
 # --- JANELA DE FONTE ---
 def acao_ajustar_fonte():
-    # Cria uma janela flutuante (Pop-up)
     janela_fonte = ctk.CTkToplevel(app)
     janela_fonte.title(get_text("font_title"))
     janela_fonte.geometry("500x280")
-    janela_fonte.attributes("-topmost", True) # Fica sempre por cima
+    janela_fonte.attributes("-topmost", True)
     janela_fonte.transient(app)
-    janela_fonte.grab_set() # Trava a janela principal enquanto essa estiver aberta
+    janela_fonte.grab_set()
 
     lbl_aviso = ctk.CTkLabel(janela_fonte, text=get_text("font_warning"), font=("Segoe UI", 14), justify="center", wraplength=450)
     lbl_aviso.pack(pady=20, padx=20)
 
-    # Caixa onde o usuário digita o número (já vem com 18 escrito)
     entrada_fonte = ctk.CTkEntry(janela_fonte, width=120, height=40, justify="center", font=("Segoe UI", 20, "bold"))
     entrada_fonte.insert(0, "18")
     entrada_fonte.pack(pady=10)
 
     def confirmar_fonte():
         valor = entrada_fonte.get()
-        if valor.isdigit(): # Verifica se é apenas número
+        if valor.isdigit():
             tamanho = int(valor)
             janela_fonte.destroy()
             threading.Thread(target=_acao_fonte_thread, args=(tamanho,)).start()
@@ -222,7 +228,6 @@ def acao_ajustar_fonte():
 
     btn_confirma = ctk.CTkButton(janela_fonte, text="Confirmar", font=("Segoe UI", 14, "bold"), height=40, command=confirmar_fonte)
     btn_confirma.pack(pady=10)
-
 
 def _acao_fonte_thread(tamanho_escolhido):
     log_print(f"\n--- AJUSTANDO FONTE PARA {tamanho_escolhido} ---")
@@ -329,24 +334,20 @@ def processar_eventos(lista_comandos):
         code = cmd.get("code")
         params = cmd.get("parameters")
         
-        # Prevenção extra caso os parâmetros estejam vazios
         if not params: continue
         
         if code in CODIGOS_PERMITIDOS:
             if code == 102: 
-                # Código 102: A lista principal de escolhas na tela
                 if len(params) > 0 and isinstance(params[0], list):
                     for i in range(len(params[0])): 
                         if isinstance(params[0][i], str):
                             params[0][i] = traduzir_google(params[0][i])
                             
             elif code == 402: 
-                # Código 402: O texto de ramificação da escolha que você encontrou
                 if len(params) > 1 and isinstance(params[1], str):
                     params[1] = traduzir_google(params[1])
                     
             else: 
-                # Outros códigos (401, 405, 108, 408): Textos normais e comentários
                 if len(params) > 0 and isinstance(params[0], str):
                     params[0] = traduzir_google(params[0])
 
@@ -425,7 +426,6 @@ def _acao_traduzir_thread():
 #  CONSTRUÇÃO DA INTERFACE (WIDGETS)
 # ==============================================================================
 
-# FRAME 1: SELEÇÃO DE IDIOMA
 frame_idioma = ctk.CTkFrame(app, fg_color="transparent")
 frame_idioma.pack(fill="both", expand=True, padx=50, pady=150)
 
@@ -439,38 +439,32 @@ combo_idioma.pack(pady=20)
 btn_iniciar = ctk.CTkButton(frame_idioma, text="INICIAR SISTEMA", font=("Segoe UI", 16, "bold"), height=50, command=iniciar_sistema)
 btn_iniciar.pack(pady=20)
 
-# FRAME 2: MENU PRINCIPAL
 frame_principal = ctk.CTkFrame(app, fg_color="transparent")
 
 lbl_titulo = ctk.CTkLabel(frame_principal, text="", font=("Segoe UI", 24, "bold"), text_color="#3a7ebf")
 lbl_titulo.pack(pady=10)
 
-# Organização dos botões em Grid (Tabela) para colocar os textos embaixo
 frame_botoes = ctk.CTkFrame(frame_principal, fg_color="transparent")
 frame_botoes.pack(pady=10)
 
 btn_font_style = ("Segoe UI", 14, "bold")
 desc_font_style = ("Segoe UI", 11)
 
-# Botão 1: Backup
 btn_backup = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_backup)
 btn_backup.grid(row=0, column=0, padx=15, pady=(15, 2))
 lbl_desc_backup = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
 lbl_desc_backup.grid(row=1, column=0, padx=15, pady=(0, 15))
 
-# Botão 2: Traduzir
 btn_traduzir = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_traduzir)
 btn_traduzir.grid(row=0, column=1, padx=15, pady=(15, 2))
 lbl_desc_traduzir = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
 lbl_desc_traduzir.grid(row=1, column=1, padx=15, pady=(0, 15))
 
-# Botão 3: Instalar
 btn_instalar = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_instalar, fg_color="#28a745", hover_color="#218838")
 btn_instalar.grid(row=2, column=0, padx=15, pady=(15, 2))
 lbl_desc_instalar = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
 lbl_desc_instalar.grid(row=3, column=0, padx=15, pady=(0, 15))
 
-# Botão 4: Ajustar Fonte
 btn_fonte = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_ajustar_fonte, fg_color="#d39e00", hover_color="#c69500")
 btn_fonte.grid(row=2, column=1, padx=15, pady=(15, 2))
 lbl_desc_fonte = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
@@ -482,5 +476,4 @@ barra_progresso.pack(pady=15)
 texto_log = ctk.CTkTextbox(frame_principal, width=700, height=220, font=("Consolas", 13), state="disabled", fg_color="#1e1e1e", text_color="#00ff00")
 texto_log.pack(pady=10)
 
-# Inicia o loop da aplicação
 app.mainloop()
