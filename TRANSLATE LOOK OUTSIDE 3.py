@@ -43,11 +43,19 @@ UI_TEXTS = {
         "es": "MAESTRO TRADUCTOR RPG MAKER - v6.0"
     },
     "menu_backup": {"pt": "1. FAZER BACKUP", "en": "1. MAKE BACKUP", "es": "1. HACER COPIA"},
+    "desc_backup": {"pt": "Cria uma cópia de segurança do jogo original.", "en": "Creates a safety copy of the original game.", "es": "Crea una copia de seguridad del juego original."},
     "menu_translate": {"pt": "2. INICIAR TRADUÇÃO", "en": "2. START TRANSLATION", "es": "2. INICIAR TRADUCCIÓN"},
+    "desc_translate": {"pt": "Traduz os arquivos usando a memória e a internet.", "en": "Translates files using memory and internet.", "es": "Traduce archivos usando memoria e internet."},
     "menu_install": {"pt": "3. APLICAR NO JOGO", "en": "3. APPLY TO GAME", "es": "3. APLICAR AL JUEGO"},
-    "menu_font": {"pt": "4. AJUSTAR FONTE (18)", "en": "4. ADJUST FONT (18)", "es": "4. AJUSTAR FUENTE (18)"},
-    "msg_done": {"pt": "Concluído!", "en": "Done!", "es": "¡Hecho!"},
-    "msg_error": {"pt": "Erro: ", "en": "Error: ", "es": "Error: "},
+    "desc_install": {"pt": "Substitui os arquivos originais pelos traduzidos.", "en": "Replaces original files with translated ones.", "es": "Reemplaza archivos originales por los traducidos."},
+    "menu_font": {"pt": "4. AJUSTAR FONTE", "en": "4. ADJUST FONT", "es": "4. AJUSTAR FUENTE"},
+    "desc_font": {"pt": "Reduz a letra para caber nos balões de texto.", "en": "Reduces font to fit in text boxes.", "es": "Reduce la letra para caber en los cuadros."},
+    "font_title": {"pt": "Ajuste de Fonte", "en": "Font Adjustment", "es": "Ajuste de Fuente"},
+    "font_warning": {
+        "pt": "O idioma traduzido pode ter palavras mais longas, fazendo com que o jogo corte os textos na tela.\n\nPara evitar isso, recomendamos diminuir o tamanho da fonte. O ideal sugerido é 18, mas você pode digitar outro valor abaixo:",
+        "en": "Translated words can be longer, causing the game to cut off text on screen.\n\nTo prevent this, we recommend lowering the font size. The ideal size is 18, but you can enter another value below:",
+        "es": "Las palabras traducidas pueden ser más largas, haciendo que el juego corte el texto.\n\nPara evitar esto, recomendamos reducir la fuente. El ideal es 18, pero puedes ingresar otro valor:"
+    }
 }
 
 def get_text(key):
@@ -75,7 +83,7 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 app = ctk.CTk()
-app.geometry("750x650")
+app.geometry("800x700")
 app.title("Mestre Tradutor RPG Maker")
 
 # Variáveis visuais
@@ -106,10 +114,18 @@ def iniciar_sistema():
     frame_principal.pack(fill="both", expand=True, padx=20, pady=20)
     
     lbl_titulo.configure(text=get_text("header_title"))
+    
     btn_backup.configure(text=get_text("menu_backup"))
+    lbl_desc_backup.configure(text=get_text("desc_backup"))
+    
     btn_traduzir.configure(text=get_text("menu_translate"))
+    lbl_desc_traduzir.configure(text=get_text("desc_translate"))
+    
     btn_instalar.configure(text=get_text("menu_install"))
+    lbl_desc_instalar.configure(text=get_text("desc_install"))
+    
     btn_fonte.configure(text=get_text("menu_font"))
+    lbl_desc_fonte.configure(text=get_text("desc_font"))
     
     threading.Thread(target=configurar_diretorios).start()
 
@@ -176,11 +192,40 @@ def _acao_backup_thread():
         set_progresso((i + 1) / total)
     log_print(f"[OK] Backup concluído em: {CONFIG['BACKUP_DIR']}")
 
-def acao_ajustar_fonte():
-    threading.Thread(target=_acao_fonte_thread).start()
 
-def _acao_fonte_thread():
-    log_print("\n--- AJUSTANDO FONTE ---")
+# --- JANELA DE FONTE ---
+def acao_ajustar_fonte():
+    # Cria uma janela flutuante (Pop-up)
+    janela_fonte = ctk.CTkToplevel(app)
+    janela_fonte.title(get_text("font_title"))
+    janela_fonte.geometry("500x280")
+    janela_fonte.attributes("-topmost", True) # Fica sempre por cima
+    janela_fonte.transient(app)
+    janela_fonte.grab_set() # Trava a janela principal enquanto essa estiver aberta
+
+    lbl_aviso = ctk.CTkLabel(janela_fonte, text=get_text("font_warning"), font=("Segoe UI", 14), justify="center", wraplength=450)
+    lbl_aviso.pack(pady=20, padx=20)
+
+    # Caixa onde o usuário digita o número (já vem com 18 escrito)
+    entrada_fonte = ctk.CTkEntry(janela_fonte, width=120, height=40, justify="center", font=("Segoe UI", 20, "bold"))
+    entrada_fonte.insert(0, "18")
+    entrada_fonte.pack(pady=10)
+
+    def confirmar_fonte():
+        valor = entrada_fonte.get()
+        if valor.isdigit(): # Verifica se é apenas número
+            tamanho = int(valor)
+            janela_fonte.destroy()
+            threading.Thread(target=_acao_fonte_thread, args=(tamanho,)).start()
+        else:
+            messagebox.showerror("Erro", "Por favor, digite apenas números inteiros.")
+
+    btn_confirma = ctk.CTkButton(janela_fonte, text="Confirmar", font=("Segoe UI", 14, "bold"), height=40, command=confirmar_fonte)
+    btn_confirma.pack(pady=10)
+
+
+def _acao_fonte_thread(tamanho_escolhido):
+    log_print(f"\n--- AJUSTANDO FONTE PARA {tamanho_escolhido} ---")
     caminho_system = os.path.join(CONFIG["GAME_DIR"], "data", "System.json")
     
     if not os.path.exists(caminho_system):
@@ -192,12 +237,12 @@ def _acao_fonte_thread():
             dados = json.load(f)
         
         if "advanced" in dados and "fontSize" in dados["advanced"]:
-            dados["advanced"]["fontSize"] = 18
+            dados["advanced"]["fontSize"] = tamanho_escolhido
             
         with open(caminho_system, 'w', encoding='utf-8') as f:
             json.dump(dados, f, ensure_ascii=False, indent=4)
             
-        log_print("[OK] Tamanho da fonte alterado para 18 no jogo!")
+        log_print(f"[OK] Tamanho da fonte alterado para {tamanho_escolhido} no jogo!")
     except Exception as e:
         log_print(f"[ERRO] Falha ao ajustar: {e}")
 
@@ -400,28 +445,42 @@ frame_principal = ctk.CTkFrame(app, fg_color="transparent")
 lbl_titulo = ctk.CTkLabel(frame_principal, text="", font=("Segoe UI", 24, "bold"), text_color="#3a7ebf")
 lbl_titulo.pack(pady=10)
 
+# Organização dos botões em Grid (Tabela) para colocar os textos embaixo
 frame_botoes = ctk.CTkFrame(frame_principal, fg_color="transparent")
 frame_botoes.pack(pady=10)
 
-btn_font = ("Segoe UI", 14, "bold")
-btn_backup = ctk.CTkButton(frame_botoes, text="", font=btn_font, height=40, width=250, state="disabled", command=acao_backup)
-btn_backup.grid(row=0, column=0, padx=10, pady=10)
+btn_font_style = ("Segoe UI", 14, "bold")
+desc_font_style = ("Segoe UI", 11)
 
-btn_traduzir = ctk.CTkButton(frame_botoes, text="", font=btn_font, height=40, width=250, state="disabled", command=acao_traduzir)
-btn_traduzir.grid(row=0, column=1, padx=10, pady=10)
+# Botão 1: Backup
+btn_backup = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_backup)
+btn_backup.grid(row=0, column=0, padx=15, pady=(15, 2))
+lbl_desc_backup = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
+lbl_desc_backup.grid(row=1, column=0, padx=15, pady=(0, 15))
 
-btn_instalar = ctk.CTkButton(frame_botoes, text="", font=btn_font, height=40, width=250, state="disabled", command=acao_instalar, fg_color="#28a745", hover_color="#218838")
-btn_instalar.grid(row=1, column=0, padx=10, pady=10)
+# Botão 2: Traduzir
+btn_traduzir = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_traduzir)
+btn_traduzir.grid(row=0, column=1, padx=15, pady=(15, 2))
+lbl_desc_traduzir = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
+lbl_desc_traduzir.grid(row=1, column=1, padx=15, pady=(0, 15))
 
-btn_fonte = ctk.CTkButton(frame_botoes, text="", font=btn_font, height=40, width=250, state="disabled", command=acao_ajustar_fonte, fg_color="#d39e00", hover_color="#c69500")
-btn_fonte.grid(row=1, column=1, padx=10, pady=10)
+# Botão 3: Instalar
+btn_instalar = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_instalar, fg_color="#28a745", hover_color="#218838")
+btn_instalar.grid(row=2, column=0, padx=15, pady=(15, 2))
+lbl_desc_instalar = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
+lbl_desc_instalar.grid(row=3, column=0, padx=15, pady=(0, 15))
 
-barra_progresso = ctk.CTkProgressBar(frame_principal, variable=progresso_var, width=520, height=15)
-barra_progresso.pack(pady=20)
+# Botão 4: Ajustar Fonte
+btn_fonte = ctk.CTkButton(frame_botoes, text="", font=btn_font_style, height=40, width=280, state="disabled", command=acao_ajustar_fonte, fg_color="#d39e00", hover_color="#c69500")
+btn_fonte.grid(row=2, column=1, padx=15, pady=(15, 2))
+lbl_desc_fonte = ctk.CTkLabel(frame_botoes, text="", font=desc_font_style, text_color="gray")
+lbl_desc_fonte.grid(row=3, column=1, padx=15, pady=(0, 15))
 
-texto_log = ctk.CTkTextbox(frame_principal, width=700, height=300, font=("Consolas", 13), state="disabled", fg_color="#1e1e1e", text_color="#00ff00")
+barra_progresso = ctk.CTkProgressBar(frame_principal, variable=progresso_var, width=590, height=15)
+barra_progresso.pack(pady=15)
+
+texto_log = ctk.CTkTextbox(frame_principal, width=700, height=220, font=("Consolas", 13), state="disabled", fg_color="#1e1e1e", text_color="#00ff00")
 texto_log.pack(pady=10)
 
 # Inicia o loop da aplicação
-app.mainloop()
 app.mainloop()
