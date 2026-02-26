@@ -1,0 +1,10 @@
+# Ignorar pastas geradas pelo próprio script
+_TRADUTOR_FILES/
+
+# Ignorar pastas geradas pelo Auto-Py-To-Exe
+build/
+dist/
+*.spec
+
+# Ignorar arquivos temporários do Python
+__pycache__/
